@@ -1,10 +1,14 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { api } from '../api/client';
+import { api, getApiBaseUrl } from '../api/client';
 import { SearchBar } from '../components/SearchBar';
 import { ResidentList } from '../components/ResidentList';
 import { useAuth } from '../auth/AuthContext';
 
 const DEFAULT_LIMIT = 10;
+
+function apiBaseUrl() {
+  return getApiBaseUrl();
+}
 
 // PUBLIC_INTERFACE
 export function DirectoryPage() {
@@ -19,6 +23,9 @@ export function DirectoryPage() {
   const [error, setError] = useState('');
   const [residents, setResidents] = useState([]);
   const [total, setTotal] = useState(undefined);
+
+  const [healthLoading, setHealthLoading] = useState(false);
+  const [healthResult, setHealthResult] = useState('');
 
   const query = useMemo(() => ({ q, page, page_size: limit }), [q, page, limit]);
 
@@ -50,6 +57,35 @@ export function DirectoryPage() {
         <div className="page-header">
           <h1 className="h1">Directory</h1>
           <p className="muted">Search for residents by name, address, phone, or email.</p>
+
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginTop: 12 }}>
+            <button
+              type="button"
+              className="btn"
+              onClick={async () => {
+                setHealthLoading(true);
+                setHealthResult('');
+                try {
+                  const res = await fetch(`${apiBaseUrl()}/config/health`);
+                  const json = await res.json().catch(() => null);
+                  if (!res.ok) {
+                    const msg = json?.detail || json?.message || `HTTP ${res.status}`;
+                    throw new Error(msg);
+                  }
+                  setHealthResult(`OK (CORS origins: ${(json?.cors?.allowed_origins || []).join(', ')})`);
+                } catch (e) {
+                  setHealthResult(e.message || 'Health check failed.');
+                } finally {
+                  setHealthLoading(false);
+                }
+              }}
+              disabled={healthLoading}
+            >
+              {healthLoading ? 'Checking…' : 'API Health'}
+            </button>
+
+            {healthResult ? <span className="muted">{healthResult}</span> : null}
+          </div>
         </div>
 
         <SearchBar
