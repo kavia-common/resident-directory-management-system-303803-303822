@@ -20,7 +20,7 @@ export function DirectoryPage() {
   const [residents, setResidents] = useState([]);
   const [total, setTotal] = useState(undefined);
 
-  const query = useMemo(() => ({ q, page, limit }), [q, page, limit]);
+  const query = useMemo(() => ({ q, page, page_size: limit }), [q, page, limit]);
 
   const load = async () => {
     setLoading(true);
