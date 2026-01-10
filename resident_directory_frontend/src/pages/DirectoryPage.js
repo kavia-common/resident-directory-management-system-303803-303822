@@ -1,10 +1,11 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { api, getApiBaseUrl } from '../api/client';
 import { SearchBar } from '../components/SearchBar';
 import { ResidentList } from '../components/ResidentList';
 import { useAuth } from '../auth/AuthContext';
 
-const DEFAULT_LIMIT = 10;
+const DEFAULT_PAGE_SIZE = 10;
+const Q_DEBOUNCE_MS = 300;
 
 function apiBaseUrl() {
   return getApiBaseUrl();
@@ -12,51 +13,99 @@ function apiBaseUrl() {
 
 // PUBLIC_INTERFACE
 export function DirectoryPage() {
-  /** Public resident directory with search + pagination. */
+  /** Public resident directory with search + pagination and building/unit filters. */
   const { token } = useAuth();
 
-  const [q, setQ] = useState('');
-  const [page, setPage] = useState(1);
-  const [limit] = useState(DEFAULT_LIMIT);
+  // Filters
+  const [qInput, setQInput] = useState(''); // raw typing value
+  const [q, setQ] = useState(''); // debounced committed value used for querying
+  const [building, setBuilding] = useState('');
+  const [unit, setUnit] = useState('');
 
+  // Paging
+  const [page, setPage] = useState(1);
+  const [pageSize] = useState(DEFAULT_PAGE_SIZE);
+
+  // Data state
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [residents, setResidents] = useState([]);
   const [total, setTotal] = useState(undefined);
 
+  // Misc/diagnostics
   const [healthLoading, setHealthLoading] = useState(false);
   const [healthResult, setHealthResult] = useState('');
 
-  const query = useMemo(() => ({ q, page, page_size: limit }), [q, page, limit]);
+  // Track if user has applied any filters (for better empty-state copy)
+  const hasAnyFilter = Boolean(q.trim() || building.trim() || unit.trim());
+
+  // Debounce q typing -> q (query value)
+  useEffect(() => {
+    const handle = window.setTimeout(() => {
+      setQ(qInput);
+    }, Q_DEBOUNCE_MS);
+    return () => window.clearTimeout(handle);
+  }, [qInput]);
+
+  const query = useMemo(
+    () => ({
+      q,
+      building,
+      unit,
+      page,
+      page_size: pageSize,
+    }),
+    [q, building, unit, page, pageSize]
+  );
+
+  const latestRequestId = useRef(0);
 
   const load = async () => {
+    // Ensure stale responses don't overwrite newer ones.
+    const requestId = ++latestRequestId.current;
+
     setLoading(true);
     setError('');
     try {
       const data = await api.listResidents({ token, ...query });
-      // Support either {items,total} or direct array responses.
+
+      // New backend returns {items,total,page,page_size}. Keep backward compat just in case.
       const items = Array.isArray(data) ? data : data?.items || data?.results || [];
       const t = Array.isArray(data) ? undefined : data?.total ?? data?.count;
+
+      if (requestId !== latestRequestId.current) return;
+
       setResidents(items);
       setTotal(t);
     } catch (e) {
+      if (requestId !== latestRequestId.current) return;
       setError(e.message || 'Failed to load residents.');
     } finally {
+      if (requestId !== latestRequestId.current) return;
       setLoading(false);
     }
   };
 
+  // Auto-load on filter/pagination change.
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query.q, query.page, query.limit, token]);
+  }, [query.q, query.building, query.unit, query.page, query.page_size, token]);
+
+  const onClearFilters = () => {
+    setQInput('');
+    setQ('');
+    setBuilding('');
+    setUnit('');
+    setPage(1);
+  };
 
   return (
     <div className="page">
       <div className="container">
         <div className="page-header">
           <h1 className="h1">Directory</h1>
-          <p className="muted">Search for residents by name, address, phone, or email.</p>
+          <p className="muted">Search for residents by name and optionally filter by building/unit.</p>
 
           <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginTop: 12 }}>
             <button
@@ -89,20 +138,53 @@ export function DirectoryPage() {
         </div>
 
         <SearchBar
-          value={q}
-          onChange={(val) => {
-            setQ(val);
+          qValue={qInput}
+          buildingValue={building}
+          unitValue={unit}
+          onChangeQ={(val) => {
+            setQInput(val);
             setPage(1);
           }}
+          onChangeBuilding={(val) => {
+            setBuilding(val);
+            setPage(1);
+          }}
+          onChangeUnit={(val) => {
+            setUnit(val);
+            setPage(1);
+          }}
+          onClear={onClearFilters}
           onSubmit={() => load()}
         />
+
+        {typeof total === 'number' ? (
+          <p className="muted small" style={{ margin: '6px 0 12px' }}>
+            Showing <strong>{residents.length}</strong> of <strong>{total}</strong> result{total === 1 ? '' : 's'}.
+          </p>
+        ) : null}
+
+        {(!loading && !error && residents.length === 0) ? (
+          <div className="card" style={{ marginBottom: 12 }}>
+            <p className="td-strong">{hasAnyFilter ? 'No results match your filters.' : 'No residents found.'}</p>
+            <p className="muted" style={{ marginTop: 6 }}>
+              {hasAnyFilter ? 'Try clearing filters or searching for a different name.' : 'Please check back later.'}
+            </p>
+            {hasAnyFilter ? (
+              <div style={{ marginTop: 12 }}>
+                <button className="btn btn-secondary" type="button" onClick={onClearFilters}>
+                  Clear filters
+                </button>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
 
         <ResidentList
           residents={residents}
           loading={loading}
           error={error}
           page={page}
-          limit={limit}
+          limit={pageSize}
           total={total}
           onPageChange={(nextPage) => setPage(nextPage)}
           mode="directory"
