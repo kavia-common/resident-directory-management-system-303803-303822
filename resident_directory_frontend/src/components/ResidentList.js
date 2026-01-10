@@ -76,7 +76,16 @@ export function ResidentList({
                   </div>
                 </td>
                 <td className="td-strong">{r.name}</td>
-                <td>{r.address}</td>
+                <td>
+                  {r.address}
+                  {r.building || r.unit ? (
+                    <div className="muted" style={{ marginTop: 4 }}>
+                      {r.building ? `Building: ${r.building}` : null}
+                      {r.building && r.unit ? ' • ' : null}
+                      {r.unit ? `Unit: ${r.unit}` : null}
+                    </div>
+                  ) : null}
+                </td>
                 <td>{formatContact(r)}</td>
                 {mode === 'admin' ? (
                   <td>

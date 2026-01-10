@@ -22,6 +22,8 @@ export function ResidentForm({ initialValue, onCancel, onSubmit, submitting, sub
       address: '',
       email: '',
       phone: '',
+      building: '',
+      unit: '',
       photo_url: '',
       ...initialValue,
     }),
@@ -124,6 +126,36 @@ export function ResidentForm({ initialValue, onCancel, onSubmit, submitting, sub
         </div>
 
         {touched.contact && errors.contact ? <div className="field-error">{errors.contact}</div> : null}
+
+        <div className="form-grid">
+          <div className="form-row">
+            <label className="label" htmlFor="resident-building">
+              Building <span className="muted">(optional)</span>
+            </label>
+            <input
+              id="resident-building"
+              className="input"
+              value={values.building || ''}
+              onChange={(e) => setField('building', e.target.value)}
+              type="text"
+              placeholder="e.g., A"
+            />
+          </div>
+
+          <div className="form-row">
+            <label className="label" htmlFor="resident-unit">
+              Unit <span className="muted">(optional)</span>
+            </label>
+            <input
+              id="resident-unit"
+              className="input"
+              value={values.unit || ''}
+              onChange={(e) => setField('unit', e.target.value)}
+              type="text"
+              placeholder="e.g., 12B"
+            />
+          </div>
+        </div>
 
         <div className="form-row">
           <label className="label" htmlFor="resident-photo">
