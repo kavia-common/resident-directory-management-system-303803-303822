@@ -24,7 +24,11 @@ export function DirectoryPage() {
 
   // Paging
   const [page, setPage] = useState(1);
-  const [pageSize] = useState(DEFAULT_PAGE_SIZE);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
+
+  // Sorting (server-side preferred; ResidentList also applies a safe client-side fallback)
+  const [sort, setSort] = useState('name');
+  const [sortDir, setSortDir] = useState('asc');
 
   // Data state
   const [loading, setLoading] = useState(false);
@@ -54,8 +58,11 @@ export function DirectoryPage() {
       unit,
       page,
       page_size: pageSize,
+      // Backend may accept sort/sort_dir; api client forwards as sort_by/sort_dir.
+      sort,
+      sort_dir: sortDir,
     }),
-    [q, building, unit, page, pageSize]
+    [q, building, unit, page, pageSize, sort, sortDir]
   );
 
   const latestRequestId = useRef(0);
@@ -75,6 +82,12 @@ export function DirectoryPage() {
 
       if (requestId !== latestRequestId.current) return;
 
+      // If backend returns canonical paging values, honor them.
+      if (!Array.isArray(data)) {
+        if (typeof data?.page === 'number' && data.page >= 1) setPage(data.page);
+        if (typeof data?.page_size === 'number' && data.page_size >= 1) setPageSize(data.page_size);
+      }
+
       setResidents(items);
       setTotal(t);
     } catch (e) {
@@ -90,7 +103,7 @@ export function DirectoryPage() {
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query.q, query.building, query.unit, query.page, query.page_size, token]);
+  }, [query.q, query.building, query.unit, query.page, query.page_size, query.sort, query.sort_dir, token]);
 
   const onClearFilters = () => {
     setQInput('');
@@ -185,7 +198,19 @@ export function DirectoryPage() {
           error={error}
           page={page}
           limit={pageSize}
+          pageSize={pageSize}
+          onPageSizeChange={(next) => {
+            setPageSize(next);
+            setPage(1);
+          }}
           total={total}
+          sort={sort}
+          sortDir={sortDir}
+          onSortChange={({ sort: nextSort, sortDir: nextDir }) => {
+            setSort(nextSort);
+            setSortDir(nextDir);
+            setPage(1);
+          }}
           onPageChange={(nextPage) => setPage(nextPage)}
           mode="directory"
         />

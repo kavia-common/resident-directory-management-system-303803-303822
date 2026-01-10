@@ -133,6 +133,8 @@ export const api = {
     email,
     updated_at_from,
     updated_at_to,
+    // Sorting: accept either sort (DirectoryPage) or sort_by (Admin page / backend)
+    sort,
     sort_by,
     sort_dir,
     page,
@@ -152,7 +154,9 @@ export const api = {
         email,
         updated_at_from,
         updated_at_to,
-        sort_by,
+        // Send both to maximize compatibility across backend versions; empty values are omitted by client.
+        sort,
+        sort_by: sort_by ?? sort,
         sort_dir,
         page,
         page_size: page_size ?? limit,
