@@ -3,45 +3,78 @@ import { api, setUnauthorizedHandler } from '../api/client';
 
 const AuthContext = createContext(null);
 
-const TOKEN_STORAGE_KEY = 'resident_directory_token';
+const ACCESS_TOKEN_KEY = 'resident_directory_access_token';
+const REFRESH_TOKEN_KEY = 'resident_directory_refresh_token';
 
 // PUBLIC_INTERFACE
 export function AuthProvider({ children }) {
-  /** Provides authentication state (token/user) and actions (login/logout/refreshMe). */
-  const [token, setToken] = useState(() => localStorage.getItem(TOKEN_STORAGE_KEY) || '');
+  /** Provides authentication state (tokens/user) and actions (login/logout/refreshMe/refreshSession). */
+  const [accessToken, setAccessToken] = useState(() => localStorage.getItem(ACCESS_TOKEN_KEY) || '');
+  const [refreshToken, setRefreshToken] = useState(() => localStorage.getItem(REFRESH_TOKEN_KEY) || '');
   const [user, setUser] = useState(null);
   const [loadingMe, setLoadingMe] = useState(false);
 
-  const logout = useCallback(() => {
-    setToken('');
+  const clearSession = useCallback(() => {
+    setAccessToken('');
+    setRefreshToken('');
     setUser(null);
-    localStorage.removeItem(TOKEN_STORAGE_KEY);
+    localStorage.removeItem(ACCESS_TOKEN_KEY);
+    localStorage.removeItem(REFRESH_TOKEN_KEY);
   }, []);
 
-  // Register global 401 handler
+  const logout = useCallback(async () => {
+    // Best-effort server logout (revoke refresh tokens)
+    try {
+      if (refreshToken) {
+        await api.logout({ refresh_token: refreshToken });
+      }
+    } catch {
+      // ignore network/server errors; we still clear local session
+    } finally {
+      clearSession();
+    }
+  }, [refreshToken, clearSession]);
+
+  const refreshSession = useCallback(async () => {
+    if (!refreshToken) throw new Error('No refresh token available.');
+    const data = await api.refresh({ refresh_token: refreshToken });
+    const newAccess = data?.access_token || '';
+    const newRefresh = data?.refresh_token || '';
+    if (!newAccess || !newRefresh) throw new Error('Refresh succeeded but tokens missing.');
+    setAccessToken(newAccess);
+    setRefreshToken(newRefresh);
+    localStorage.setItem(ACCESS_TOKEN_KEY, newAccess);
+    localStorage.setItem(REFRESH_TOKEN_KEY, newRefresh);
+    return { accessToken: newAccess, refreshToken: newRefresh };
+  }, [refreshToken]);
+
+  // Register global 401 handler: attempt refresh once; if refresh fails, logout.
   useEffect(() => {
-    setUnauthorizedHandler(() => {
-      logout();
-      // Navigation is handled at route level; clearing token forces ProtectedRoute to redirect.
+    setUnauthorizedHandler(async () => {
+      try {
+        await refreshSession();
+      } catch {
+        await logout();
+      }
     });
-  }, [logout]);
+  }, [refreshSession, logout]);
 
   const refreshMe = useCallback(async () => {
-    if (!token) {
+    if (!accessToken) {
       setUser(null);
       return;
     }
     setLoadingMe(true);
     try {
-      const me = await api.me(token);
+      const me = await api.me(accessToken);
       setUser(me);
     } catch (e) {
-      // If token invalid, api client will invoke unauthorized handler (logout)
+      // Unauthorized handler may refresh/logout; do not overwrite state here.
       setUser(null);
     } finally {
       setLoadingMe(false);
     }
-  }, [token]);
+  }, [accessToken]);
 
   useEffect(() => {
     refreshMe();
@@ -49,33 +82,41 @@ export function AuthProvider({ children }) {
 
   const login = useCallback(async ({ username, password }) => {
     const data = await api.login({ username, password });
-    const newToken = data?.access_token || data?.token || '';
-    if (!newToken) {
-      throw new Error('Login succeeded but no token returned by server.');
+    const newAccess = data?.access_token || '';
+    const newRefresh = data?.refresh_token || '';
+    if (!newAccess || !newRefresh) {
+      throw new Error('Login succeeded but tokens were not returned by server.');
     }
-    setToken(newToken);
-    localStorage.setItem(TOKEN_STORAGE_KEY, newToken);
-    // Immediately fetch /me for header display
+    setAccessToken(newAccess);
+    setRefreshToken(newRefresh);
+    localStorage.setItem(ACCESS_TOKEN_KEY, newAccess);
+    localStorage.setItem(REFRESH_TOKEN_KEY, newRefresh);
+
+    // Immediately fetch /me for header display (includes role)
     try {
-      const me = await api.me(newToken);
+      const me = await api.me(newAccess);
       setUser(me);
     } catch {
-      // ignore; protected routes will still work with token until /me succeeds
+      // ignore
     }
-    return newToken;
+    return newAccess;
   }, []);
 
   const value = useMemo(
     () => ({
-      token,
+      token: accessToken, // back-compat for existing code paths
+      accessToken,
+      refreshToken,
       user,
-      isAuthenticated: Boolean(token),
+      isAuthenticated: Boolean(accessToken),
+      isAdmin: (user?.role || '').toLowerCase() === 'admin',
       loadingMe,
       login,
       logout,
+      refreshSession,
       refreshMe,
     }),
-    [token, user, loadingMe, login, logout, refreshMe]
+    [accessToken, refreshToken, user, loadingMe, login, logout, refreshSession, refreshMe]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

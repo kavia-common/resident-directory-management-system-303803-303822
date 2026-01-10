@@ -5,8 +5,24 @@ import { useAuth } from '../auth/AuthContext';
 // PUBLIC_INTERFACE
 export function Header() {
   /** Top header bar with navigation and auth controls. */
-  const { isAuthenticated, user, logout } = useAuth();
+  const { isAuthenticated, user, isAdmin, logout } = useAuth();
   const navigate = useNavigate();
+<<<<<<< SEARCH
+            <NavLink
+              to="/admin/residents"
+              className={({ isActive }) => `app-nav__link ${isActive ? 'is-active' : ''}`}
+            >
+              Admin
+            </NavLink>
+=======
+            {isAdmin ? (
+              <NavLink
+                to="/admin/residents"
+                className={({ isActive }) => `app-nav__link ${isActive ? 'is-active' : ''}`}
+              >
+                Admin
+              </NavLink>
+            ) : null}
 
   const onLogout = () => {
     logout();

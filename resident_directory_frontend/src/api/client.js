@@ -121,6 +121,8 @@ async function requestText(path, { method = 'GET', token, query } = {}) {
 export const api = {
   /** Convenience typed methods for this app's backend API. */
   login: (payload) => request('/auth/login', { method: 'POST', body: payload }),
+  refresh: (payload) => request('/auth/refresh', { method: 'POST', body: payload }),
+  logout: (payload) => request('/auth/logout', { method: 'POST', body: payload }),
   me: (token) => request('/auth/me', { method: 'GET', token }),
 
   listResidents: ({
