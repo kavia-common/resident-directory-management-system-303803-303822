@@ -125,6 +125,19 @@ export const api = {
   logout: (payload) => request('/auth/logout', { method: 'POST', body: payload }),
   me: (token) => request('/auth/me', { method: 'GET', token }),
 
+  // Admin management (note: backend must expose these routes; see Instructions for future agent)
+  listAdmins: ({ token, q, page, page_size } = {}) =>
+    request('/admins', { method: 'GET', token, query: { q, page, page_size } }),
+
+  createAdmin: ({ token, admin } = {}) => request('/admins', { method: 'POST', token, body: admin }),
+
+  updateAdmin: ({ token, id, admin } = {}) =>
+    request(`/admins/${encodeURIComponent(id)}`, { method: 'PUT', token, body: admin }),
+
+  // Optional/if supported by backend in future:
+  resetAdminPassword: ({ token, id, password } = {}) =>
+    request(`/admins/${encodeURIComponent(id)}/reset-password`, { method: 'POST', token, body: { password } }),
+
   listResidents: ({
     token,
     q,

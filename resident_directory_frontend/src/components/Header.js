@@ -7,22 +7,6 @@ export function Header() {
   /** Top header bar with navigation and auth controls. */
   const { isAuthenticated, user, isAdmin, logout } = useAuth();
   const navigate = useNavigate();
-<<<<<<< SEARCH
-            <NavLink
-              to="/admin/residents"
-              className={({ isActive }) => `app-nav__link ${isActive ? 'is-active' : ''}`}
-            >
-              Admin
-            </NavLink>
-=======
-            {isAdmin ? (
-              <NavLink
-                to="/admin/residents"
-                className={({ isActive }) => `app-nav__link ${isActive ? 'is-active' : ''}`}
-              >
-                Admin
-              </NavLink>
-            ) : null}
 
   const onLogout = () => {
     logout();
@@ -36,16 +20,25 @@ export function Header() {
           <Link to="/" className="app-title" aria-label="Go to Resident Directory">
             Resident Directory
           </Link>
+
           <nav className="app-nav" aria-label="Primary navigation">
             <NavLink to="/" end className={({ isActive }) => `app-nav__link ${isActive ? 'is-active' : ''}`}>
               Directory
             </NavLink>
-            <NavLink
-              to="/admin/residents"
-              className={({ isActive }) => `app-nav__link ${isActive ? 'is-active' : ''}`}
-            >
-              Admin
-            </NavLink>
+
+            {isAdmin ? (
+              <>
+                <NavLink
+                  to="/admin/residents"
+                  className={({ isActive }) => `app-nav__link ${isActive ? 'is-active' : ''}`}
+                >
+                  Residents
+                </NavLink>
+                <NavLink to="/admin/admins" className={({ isActive }) => `app-nav__link ${isActive ? 'is-active' : ''}`}>
+                  Admins
+                </NavLink>
+              </>
+            ) : null}
           </nav>
         </div>
 
@@ -53,7 +46,7 @@ export function Header() {
           {isAuthenticated ? (
             <>
               <span className="chip" aria-label="Authenticated user">
-                {user?.username ? `Admin: ${user.username}` : 'Admin'}
+                {user?.username ? `${user.username} (${user?.role || 'unknown'})` : 'Signed in'}
               </span>
               <button className="btn btn-danger" type="button" onClick={onLogout}>
                 Logout

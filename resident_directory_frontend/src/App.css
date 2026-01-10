@@ -140,6 +140,11 @@
   color: var(--danger);
 }
 
+.text-danger {
+  color: var(--danger);
+  font-weight: 700;
+}
+
 .chip {
   display: inline-flex;
   align-items: center;
